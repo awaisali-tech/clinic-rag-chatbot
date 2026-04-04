@@ -1,4 +1,5 @@
 streamlit
 chromadb
-google-generativeai
+onnxruntime
+groq
 python-dotenv
