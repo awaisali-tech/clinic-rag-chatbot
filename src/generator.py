@@ -1,4 +1,3 @@
-# src/generator.py
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -39,9 +38,6 @@ def get_groq_client():
 
 def generate_answer(user_question: str,
                     chat_history: list = None) -> dict:
-    """
-    Full RAG pipeline — clean and simple.
-    """
     if chat_history is None:
         chat_history = []
 
