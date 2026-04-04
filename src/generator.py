@@ -38,22 +38,16 @@ def get_groq_client():
 
 
 def generate_answer(user_question: str,
-                    chat_history: list = None,
-                    collection=None) -> dict:
+                    chat_history: list = None) -> dict:
     """
-    Full RAG pipeline — now accepts collection as parameter
-    so it reuses the same ChromaDB instance across all users.
+    Full RAG pipeline — clean and simple.
     """
     if chat_history is None:
         chat_history = []
 
-    retrieved_chunks = retrieve_relevant_chunks(
-        user_question,
-        n_results=3,
-        collection=collection      # ← pass shared collection
-    )
-    context_text = format_context_for_llm(retrieved_chunks)
-    source_ids   = [chunk["id"] for chunk in retrieved_chunks]
+    retrieved_chunks = retrieve_relevant_chunks(user_question, n_results=3)
+    context_text     = format_context_for_llm(retrieved_chunks)
+    source_ids       = [chunk["id"] for chunk in retrieved_chunks]
 
     user_message_with_context = f"""Please answer the following patient question.
 
