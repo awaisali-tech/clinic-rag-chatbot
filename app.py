@@ -5,37 +5,64 @@ import os
 
 sys.path.append(os.path.dirname(__file__))
 
-from src.generator import generate_answer
 
-
-# ── AUTO INGEST ──────────────────────────────────────────────────────────────
-# @st.cache_resource = runs ONCE per session, not on every message
+# ── SHARED DATABASE — initialized ONCE, shared across ALL users ──────────────
+# @st.cache_resource is Streamlit's way of sharing one resource
+# across all users and all sessions — perfect for a database connection!
 @st.cache_resource
-def initialize_database():
-    from src.embedder import get_chroma_collection
+def get_shared_collection():
+    """
+    Creates ONE ChromaDB collection shared by everyone.
+    Streamlit Cache Resource keeps this alive for the entire app lifetime.
+    """
+    import chromadb
+    from chromadb.utils import embedding_functions
     from src.data_loader import load_clinic_data
     from src.chunker import create_chunks
-    from src.embedder import ingest_chunks
 
-    collection = get_chroma_collection()
-    count = collection.count()
-    print(f"ChromaDB has {count} chunks on startup")
+    print("Initializing shared ChromaDB collection...")
 
-    if count == 0:
-        print("Database empty — ingesting now...")
+    # Always use EphemeralClient on cloud
+    is_cloud = not os.path.exists(
+        os.path.join(os.path.dirname(__file__), "chroma_db")
+    )
+
+    if is_cloud:
+        client = chromadb.EphemeralClient()
+    else:
+        from src.embedder import DB_PATH
+        client = chromadb.PersistentClient(path=DB_PATH)
+
+    ef = embedding_functions.DefaultEmbeddingFunction()
+    collection = client.get_or_create_collection(
+        name="clinic_knowledge",
+        embedding_function=ef,
+        metadata={"hnsw:space": "cosine"}
+    )
+
+    # Ingest if empty
+    if collection.count() == 0:
+        print("Collection empty — ingesting data...")
         data_path = os.path.join(
             os.path.dirname(__file__), "data", "clinic_data.json"
         )
         clinic_data = load_clinic_data(data_path)
-        chunks = create_chunks(clinic_data)
-        ingest_chunks(chunks)
-        print(f"Done! Ingested {len(chunks)} chunks.")
+        chunks      = create_chunks(clinic_data)
+        ids   = [c["id"]   for c in chunks]
+        texts = [c["text"] for c in chunks]
+        collection.add(ids=ids, documents=texts)
+        print(f"✅ Ingested {len(chunks)} chunks!")
 
-# Run once when app starts
-initialize_database()
+    print(f"Collection ready with {collection.count()} chunks ✅")
+    return collection
 
 
-# ── PAGE CONFIG ──────────────────────────────────────────────────────────────
+# Get the shared collection — same instance for ALL users
+collection = get_shared_collection()
+
+from src.generator import generate_answer
+
+# ── PAGE CONFIG ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Clinic Assistant",
     page_icon="🏥",
@@ -49,8 +76,7 @@ st.caption(
 )
 st.divider()
 
-
-# ── SESSION STATE ────────────────────────────────────────────────────────────
+# ── SESSION STATE ─────────────────────────────────────────────────────────────
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {
@@ -65,14 +91,12 @@ if "messages" not in st.session_state:
         }
     ]
 
-
-# ── DISPLAY CHAT HISTORY ─────────────────────────────────────────────────────
+# ── DISPLAY CHAT HISTORY ──────────────────────────────────────────────────────
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-
-# ── HANDLE USER INPUT ────────────────────────────────────────────────────────
+# ── HANDLE USER INPUT ─────────────────────────────────────────────────────────
 user_input = st.chat_input("Ask about doctors, services, timings...")
 
 if user_input:
@@ -97,7 +121,8 @@ if user_input:
         with st.spinner("🔍 Searching clinic records... please wait"):
             result = generate_answer(
                 user_question=user_input,
-                chat_history=groq_history
+                chat_history=groq_history,
+                collection=collection    # ← pass shared collection
             )
 
         st.markdown(result["answer"])

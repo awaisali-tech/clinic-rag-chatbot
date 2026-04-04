@@ -6,64 +6,47 @@ import os
 COLLECTION_NAME = "clinic_knowledge"
 DB_PATH = os.path.join(os.path.dirname(__file__), "..", "chroma_db")
 
-# ── SINGLETON ────────────────────────────────────────────────────────────────
-# This variable holds ONE shared client for the entire app session.
-# "Singleton" means only one instance exists — everyone shares the same one.
-_client = None
-_collection = None
-
 
 def get_embedding_function():
     return embedding_functions.DefaultEmbeddingFunction()
 
 
-def get_chroma_collection():
+def get_chroma_collection(client=None):
     """
-    Returns the SAME collection instance every time it's called.
-    This prevents creating multiple empty clients on Streamlit Cloud.
+    Creates or connects to ChromaDB collection.
+    Accepts an optional client — if not provided, creates one.
     """
-    global _client, _collection
+    if client is None:
+        is_cloud = not os.path.exists(
+            os.path.join(os.path.dirname(__file__), "..", "chroma_db")
+        )
+        if is_cloud:
+            client = chromadb.EphemeralClient()
+        else:
+            client = chromadb.PersistentClient(path=DB_PATH)
 
-    # If collection already exists — return it immediately
-    if _collection is not None:
-        return _collection
-
-    # Detect environment
-    is_cloud = not os.path.exists(
-        os.path.join(os.path.dirname(__file__), "..", "chroma_db")
-    )
-
-    if is_cloud:
-        print("Using in-memory ChromaDB (cloud)")
-        _client = chromadb.EphemeralClient()
-    else:
-        print("Using persistent ChromaDB (local)")
-        _client = chromadb.PersistentClient(path=DB_PATH)
-
-    _collection = _client.get_or_create_collection(
+    collection = client.get_or_create_collection(
         name=COLLECTION_NAME,
         embedding_function=get_embedding_function(),
         metadata={"hnsw:space": "cosine"}
     )
+    return collection
 
-    return _collection
 
-
-def ingest_chunks(chunks: list[dict]):
+def ingest_chunks(chunks: list[dict], client=None):
     """
     Stores chunks in ChromaDB.
     """
-    collection = get_chroma_collection()
+    collection = get_chroma_collection(client=client)
     existing_count = collection.count()
 
     if existing_count > 0:
         print(f"⚠️  Already has {existing_count} chunks. Skipping.")
-        return
+        return collection
 
     print(f"📥 Ingesting {len(chunks)} chunks...")
-
     ids   = [chunk["id"]   for chunk in chunks]
     texts = [chunk["text"] for chunk in chunks]
-
     collection.add(ids=ids, documents=texts)
-    print(f"✅ Stored {len(chunks)} chunks successfully!")
+    print(f"✅ Stored {len(chunks)} chunks!")
+    return collection
