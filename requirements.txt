@@ -1,5 +1,6 @@
 streamlit
-chromadb
+chromadb==0.5.23
 onnxruntime
 groq
 python-dotenv
+protobuf==3.20.3
