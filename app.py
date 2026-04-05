@@ -27,7 +27,7 @@ def text_to_vector(text: str, size: int = 512) -> np.ndarray:
 
 def expand_query(query: str) -> str:
     synonyms = {
-        "toothache"  : "tooth pain dental dentist",
+        "toothache"  : "tooth pain dental dentist green leaf oral care root canal endodontics",
         "tooth pain" : "dental dentist tooth",
         "root canal" : "dental endodontics teeth service",
         "eye problem": "eye ophthalmology vision optometry",
