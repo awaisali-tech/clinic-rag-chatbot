@@ -22,6 +22,9 @@ def initialize_database():
 
 
 initialize_database()
+# DEBUG LINE — shows chunk count in the app
+from src.embedder import get_chunk_count
+st.sidebar.write(f"Chunks in memory: {get_chunk_count()}")
 
 from src.generator import generate_answer
 
