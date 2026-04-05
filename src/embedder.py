@@ -19,7 +19,6 @@ def get_embedding_function():
     return embedding_functions.DefaultEmbeddingFunction()
 
 
-@staticmethod
 def _is_cloud() -> bool:
     """Detect if running on Streamlit Cloud."""
     return not os.path.exists(
