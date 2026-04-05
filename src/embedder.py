@@ -152,4 +152,4 @@ def search_chunks(query: str, n_results: int = 3) -> list[dict]:
 
 
 def get_chunk_count() -> int:
-    return len(_chunks_store)
+    return len(_chunks_store)# redeployed
