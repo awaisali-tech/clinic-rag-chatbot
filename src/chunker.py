@@ -45,7 +45,7 @@ def create_chunks(clinic_data: dict) -> list[dict]:
                 f"Phone: {clinic['contact']['phone']}\n"
                 f"Email: {clinic['contact']['email']}\n"
                 f"Services Offered: {services_text}\n"
-                f"Opening Hours:\n  {timings_lines}"
+                f"Opening Hours (Monday=Mon, Tuesday=Tue, Wednesday=Wed, Thursday=Thu, Friday=Fri, Saturday=Sat, Sunday=Sun):\n  {timings_lines}"
             )
         }
         chunks.append(overview_chunk)
