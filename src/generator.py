@@ -1,3 +1,6 @@
+# src/generator.py
+# Stage 6: LLM Response Generation using Groq
+
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
@@ -9,20 +12,21 @@ from src.retriever import retrieve_relevant_chunks, format_context_for_llm
 load_dotenv()
 
 SYSTEM_PROMPT = """You are a helpful and friendly assistant for a group of medical clinics.
-Your job is to answer patient questions accurately using ONLY the information provided in the context below.
+Answer patient questions using ONLY the information provided in the context.
 
-STRICT RULES you must always follow:
+STRICT RULES:
 1. Only use information from the provided context. Never make up details.
-2. If the context does not contain the answer, say exactly:
+2. If the context does not contain the answer, say:
    "I'm sorry, I don't have that information. Please contact the clinic directly."
-3. Always mention the clinic name when referring to specific services or doctors.
+3. Always mention the clinic name when referring to services or doctors.
 4. Keep answers concise, warm, and easy to understand.
 5. Never give medical advice or diagnose conditions.
-6. If asked something unrelated to the clinics, politely redirect the conversation.
+6. If asked something unrelated to clinics, politely redirect.
 """
 
 
-def get_groq_client():
+def get_groq_client() -> Groq:
+    """Gets Groq client from Streamlit secrets or .env file."""
     api_key = None
     try:
         import streamlit as st
@@ -37,15 +41,34 @@ def get_groq_client():
 
 
 def generate_answer(user_question: str,
+                    collection,
                     chat_history: list = None) -> dict:
+    """
+    Full RAG pipeline:
+    1. Retrieve relevant chunks from ChromaDB
+    2. Format as context
+    3. Send to Groq with system prompt
+    4. Return answer + sources
+
+    Args:
+        user_question : Patient's question
+        collection    : ChromaDB collection (passed from app.py)
+        chat_history  : Previous messages for multi-turn chat
+    """
     if chat_history is None:
         chat_history = []
 
-    retrieved_chunks = retrieve_relevant_chunks(user_question, n_results=3)
-    context_text     = format_context_for_llm(retrieved_chunks)
-    source_ids       = [chunk["id"] for chunk in retrieved_chunks]
+    # Stage 5: Retrieve
+    retrieved_chunks = retrieve_relevant_chunks(
+        query=user_question,
+        collection=collection,
+        n_results=3
+    )
+    context_text = format_context_for_llm(retrieved_chunks)
+    source_ids   = [chunk["id"] for chunk in retrieved_chunks]
 
-    user_message_with_context = f"""Please answer the following patient question.
+    # Stage 6: Generate
+    user_message = f"""Please answer the following patient question.
 
 CONTEXT (retrieved from clinic database):
 {context_text}
@@ -56,7 +79,7 @@ PATIENT QUESTION:
     messages = (
         [{"role": "system", "content": SYSTEM_PROMPT}]
         + chat_history
-        + [{"role": "user", "content": user_message_with_context}]
+        + [{"role": "user",   "content": user_message}]
     )
 
     client   = get_groq_client()
